@@ -14,28 +14,24 @@ _import_error = None
 
 try:
     import mediapipe as mp
-    # MediaPipe 0.10.30+ should have solutions attribute
-    # Try to access it directly - this forces MediaPipe to load the module
+    mp_version = getattr(mp, '__version__', 'unknown')
+    
+    # Try to access solutions.pose directly
+    # This is the standard way for MediaPipe 0.10.30+
     try:
-        # Direct access - this will work if MediaPipe is properly installed
         _test_pose = mp.solutions.pose
         _test_drawing = mp.solutions.drawing_utils
         MEDIAPIPE_AVAILABLE = True
     except AttributeError as attr_e:
-        # If solutions doesn't exist, try importing directly
-        try:
-            # Some versions might need direct import
-            import mediapipe.solutions.pose as mp_pose
-            import mediapipe.solutions.drawing_utils as mp_drawing
-            # Create solutions object
-            class Solutions:
-                pose = mp_pose
-                drawing_utils = mp_drawing
-            mp.solutions = Solutions()
-            MEDIAPIPE_AVAILABLE = True
-        except (ImportError, AttributeError) as import_e:
-            _import_error = f"MediaPipe solutions not accessible. Version: {getattr(mp, '__version__', 'unknown')}. AttributeError: {attr_e}, ImportError: {import_e}"
-            MEDIAPIPE_AVAILABLE = False
+        # If direct access fails, MediaPipe might not be properly installed
+        # or there's a version compatibility issue
+        _import_error = (
+            f"MediaPipe solutions.pose not accessible. "
+            f"Version: {mp_version}. "
+            f"Error: {attr_e}. "
+            f"Please ensure mediapipe>=0.10.30 is correctly installed."
+        )
+        MEDIAPIPE_AVAILABLE = False
 except ImportError as e:
     _import_error = f"MediaPipe import failed: {e}. Please install with: pip install mediapipe>=0.10.30"
     MEDIAPIPE_AVAILABLE = False
@@ -65,7 +61,6 @@ class PoseExtractor:
             )
         
         # If we got here, MediaPipe is available and solutions.pose is accessible
-        # (we already verified this in the module-level import)
         try:
             self.mp_pose = mp.solutions.pose
             self.pose = self.mp_pose.Pose(
@@ -75,10 +70,12 @@ class PoseExtractor:
             )
             self.mp_drawing = mp.solutions.drawing_utils
         except (AttributeError, TypeError) as e:
+            mp_version = getattr(mp, '__version__', 'unknown')
             raise ImportError(
                 f"Failed to initialize MediaPipe Pose. Error: {e}. "
-                f"MediaPipe version: {getattr(mp, '__version__', 'unknown')}. "
-                f"Try: pip install --upgrade mediapipe==0.10.14"
+                f"MediaPipe version: {mp_version}. "
+                f"This might be a version compatibility issue. "
+                f"Try: pip install --upgrade mediapipe>=0.10.30"
             )
         
     def extract_keypoints(self, frame: np.ndarray) -> Optional[np.ndarray]:
@@ -238,4 +235,3 @@ class PoseExtractor:
     def close(self):
         """Release MediaPipe resources"""
         self.pose.close()
-
