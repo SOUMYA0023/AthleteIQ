@@ -15,14 +15,20 @@ _import_error = None
 try:
     import mediapipe as mp
     # Verify MediaPipe has the required modules
-    if hasattr(mp, 'solutions') and hasattr(mp.solutions, 'pose'):
+    # Try to access solutions.pose directly to verify it works
+    try:
+        _ = mp.solutions.pose
+        _ = mp.solutions.drawing_utils
         MEDIAPIPE_AVAILABLE = True
-    else:
-        _import_error = "MediaPipe solutions.pose module not available"
+    except (AttributeError, TypeError) as e:
+        _import_error = f"MediaPipe solutions.pose not accessible: {e}. MediaPipe version: {getattr(mp, '__version__', 'unknown')}"
+        MEDIAPIPE_AVAILABLE = False
 except ImportError as e:
     _import_error = f"MediaPipe import failed: {e}"
+    MEDIAPIPE_AVAILABLE = False
 except Exception as e:
     _import_error = f"MediaPipe initialization error: {e}"
+    MEDIAPIPE_AVAILABLE = False
 
 
 class PoseExtractor:
