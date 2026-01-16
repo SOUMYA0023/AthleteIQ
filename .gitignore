@@ -42,11 +42,12 @@ ENV/
 ehthumbs.db
 Thumbs.db
 
-# Model files (large)
-*.pkl
+# Model files (large) - but keep form_classifier.pkl for deployment
 *.h5
 *.pt
 *.pth
+# Allow form_classifier.pkl to be committed for Streamlit Cloud
+!sports_form_analysis/models/form_classifier.pkl
 
 # Output files (user-generated)
 sports_form_analysis/outputs/

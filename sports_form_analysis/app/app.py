@@ -11,15 +11,29 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.append(str(Path(__file__).parent.parent))
+# Add parent directory to path for Streamlit Cloud compatibility
+current_dir = Path(__file__).parent
+parent_dir = current_dir.parent
+sys.path.insert(0, str(parent_dir))
+sys.path.insert(0, str(current_dir))
 
-from models.pose_extractor import PoseExtractor
-from models.feature_engineering import FeatureEngineer
-from models.rule_based_evaluator import RuleBasedEvaluator
-from models.ml_model import FormClassifier
-from utils.video_utils import get_video_info, save_video
-from utils.visualization import draw_keypoints_on_frame, create_analysis_report, plot_feature_timeline
+# Import modules
+try:
+    from models.pose_extractor import PoseExtractor
+    from models.feature_engineering import FeatureEngineer
+    from models.rule_based_evaluator import RuleBasedEvaluator
+    from models.ml_model import FormClassifier
+    from utils.video_utils import get_video_info, save_video
+    from utils.visualization import draw_keypoints_on_frame, create_analysis_report, plot_feature_timeline
+except ImportError as e:
+    # Fallback for Streamlit Cloud
+    sys.path.insert(0, str(parent_dir / 'sports_form_analysis'))
+    from models.pose_extractor import PoseExtractor
+    from models.feature_engineering import FeatureEngineer
+    from models.rule_based_evaluator import RuleBasedEvaluator
+    from models.ml_model import FormClassifier
+    from utils.video_utils import get_video_info, save_video
+    from utils.visualization import draw_keypoints_on_frame, create_analysis_report, plot_feature_timeline
 
 
 # Page configuration
@@ -38,7 +52,15 @@ if 'video_path' not in st.session_state:
 
 def load_model():
     """Load trained ML model"""
-    model_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'form_classifier.pkl')
+    # Handle both local and Streamlit Cloud paths
+    current_file = Path(__file__)
+    model_path = current_file.parent.parent / 'models' / 'form_classifier.pkl'
+    
+    # If not found, try alternative path for Streamlit Cloud
+    if not model_path.exists():
+        model_path = Path('sports_form_analysis/models/form_classifier.pkl')
+    
+    model_path = str(model_path)
     
     if not os.path.exists(model_path):
         st.error(f"Model not found at {model_path}. Please run train_model.py first.")
@@ -121,23 +143,28 @@ def analyze_video(video_path: str):
     # Get video info for saving
     width, height, fps, _ = get_video_info(video_path)
     
-    # Save annotated video
-    output_dir = os.path.join(os.path.dirname(__file__), '..', 'outputs', 'annotated_videos')
-    os.makedirs(output_dir, exist_ok=True)
-    output_video_path = os.path.join(output_dir, 'annotated_output.mp4')
+    # Save annotated video - handle both local and Streamlit Cloud paths
+    current_file = Path(__file__)
+    output_dir = current_file.parent.parent / 'outputs' / 'annotated_videos'
+    if not output_dir.exists():
+        output_dir = Path('sports_form_analysis/outputs/annotated_videos')
+    os.makedirs(str(output_dir), exist_ok=True)
+    output_video_path = str(output_dir / 'annotated_output.mp4')
     save_video(annotated_frames, output_video_path, fps)
     
     # Create report
-    report_dir = os.path.join(os.path.dirname(__file__), '..', 'outputs', 'reports')
-    os.makedirs(report_dir, exist_ok=True)
-    report_path = os.path.join(report_dir, 'analysis_report.txt')
+    report_dir = current_file.parent.parent / 'outputs' / 'reports'
+    if not report_dir.exists():
+        report_dir = Path('sports_form_analysis/outputs/reports')
+    os.makedirs(str(report_dir), exist_ok=True)
+    report_path = str(report_dir / 'analysis_report.txt')
     create_analysis_report(
         features_sequence, rule_verdict, rule_confidence, rule_issues,
         ml_verdict, ml_confidence, problematic_frames, report_path
     )
     
     # Create feature plot
-    plot_path = os.path.join(report_dir, 'feature_timeline.png')
+    plot_path = str(Path(report_dir) / 'feature_timeline.png')
     plot_feature_timeline(features_sequence, plot_path)
     
     # Cleanup
@@ -189,8 +216,12 @@ def main():
         """)
         
         # Check if model exists
-        model_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'form_classifier.pkl')
-        if os.path.exists(model_path):
+        current_file = Path(__file__)
+        model_path = current_file.parent.parent / 'models' / 'form_classifier.pkl'
+        if not model_path.exists():
+            model_path = Path('sports_form_analysis/models/form_classifier.pkl')
+        
+        if model_path.exists():
             st.success("✅ ML Model loaded")
         else:
             st.warning("⚠️ ML Model not found. Run train_model.py first.")
