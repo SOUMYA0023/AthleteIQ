@@ -14,28 +14,26 @@ _import_error = None
 
 try:
     import mediapipe as mp
-    # Verify MediaPipe has the required modules by accessing them directly
-    # MediaPipe uses lazy loading, so hasattr() may not work correctly
+    # For MediaPipe 0.10.30+, the structure might be different
+    # Try standard import first
     try:
-        # Try to access solutions.pose directly - this will work if MediaPipe is properly installed
-        # For newer versions, we need to import from mediapipe.python.solutions
-        if hasattr(mp, 'solutions'):
-            _test_pose = mp.solutions.pose
-            _test_drawing = mp.solutions.drawing_utils
+        _test_pose = mp.solutions.pose
+        _test_drawing = mp.solutions.drawing_utils
+        MEDIAPIPE_AVAILABLE = True
+    except AttributeError:
+        # Try alternative import for newer versions
+        try:
+            from mediapipe.python.solutions import pose as mp_pose_module
+            from mediapipe.python.solutions import drawing_utils as mp_drawing_module
+            # Create a solutions-like object
+            class Solutions:
+                pose = mp_pose_module
+                drawing_utils = mp_drawing_module
+            mp.solutions = Solutions()
             MEDIAPIPE_AVAILABLE = True
-        else:
-            # Try alternative import path for newer MediaPipe versions
-            try:
-                from mediapipe.python.solutions import pose as mp_pose
-                from mediapipe.python.solutions import drawing_utils as mp_drawing_utils
-                MEDIAPIPE_AVAILABLE = True
-                mp.solutions = type('obj', (object,), {'pose': mp_pose, 'drawing_utils': mp_drawing_utils})()
-            except ImportError:
-                _import_error = f"MediaPipe solutions not found. Version: {getattr(mp, '__version__', 'unknown')}"
-                MEDIAPIPE_AVAILABLE = False
-    except (AttributeError, TypeError, ImportError) as e:
-        _import_error = f"MediaPipe solutions.pose not accessible: {e}. MediaPipe version: {getattr(mp, '__version__', 'unknown')}"
-        MEDIAPIPE_AVAILABLE = False
+        except (ImportError, AttributeError) as alt_e:
+            _import_error = f"MediaPipe solutions not accessible. Version: {getattr(mp, '__version__', 'unknown')}. Error: {alt_e}"
+            MEDIAPIPE_AVAILABLE = False
 except ImportError as e:
     _import_error = f"MediaPipe import failed: {e}. Please install with: pip install mediapipe>=0.10.30"
     MEDIAPIPE_AVAILABLE = False
