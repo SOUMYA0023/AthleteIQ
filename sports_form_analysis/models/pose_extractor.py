@@ -4,9 +4,26 @@ Extracts 33 keypoints per frame from video input
 """
 
 import cv2
-import mediapipe as mp
 import numpy as np
 from typing import List, Tuple, Optional
+
+# Import MediaPipe with error handling
+try:
+    import mediapipe as mp
+    # Verify MediaPipe has the required modules
+    if not hasattr(mp, 'solutions'):
+        raise ImportError("MediaPipe solutions module not available")
+    if not hasattr(mp.solutions, 'pose'):
+        raise ImportError("MediaPipe pose module not available")
+    MEDIAPIPE_AVAILABLE = True
+except ImportError as e:
+    MEDIAPIPE_AVAILABLE = False
+    mp = None
+    import_error = str(e)
+except AttributeError as e:
+    MEDIAPIPE_AVAILABLE = False
+    mp = None
+    import_error = f"MediaPipe attribute error: {e}"
 
 
 class PoseExtractor:
@@ -23,13 +40,26 @@ class PoseExtractor:
             min_detection_confidence: Minimum confidence for pose detection
             min_tracking_confidence: Minimum confidence for pose tracking
         """
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(
-            min_detection_confidence=min_detection_confidence,
-            min_tracking_confidence=min_tracking_confidence,
-            model_complexity=2  # Use full model for better accuracy
-        )
-        self.mp_drawing = mp.solutions.drawing_utils
+        if not MEDIAPIPE_AVAILABLE:
+            error_msg = import_error if 'import_error' in globals() else "MediaPipe is not installed"
+            raise ImportError(
+                f"{error_msg}. Please install it with: pip install mediapipe>=0.10.0"
+            )
+        
+        try:
+            # Access MediaPipe pose solution
+            self.mp_pose = mp.solutions.pose
+            self.pose = self.mp_pose.Pose(
+                min_detection_confidence=min_detection_confidence,
+                min_tracking_confidence=min_tracking_confidence,
+                model_complexity=2  # Use full model for better accuracy
+            )
+            self.mp_drawing = mp.solutions.drawing_utils
+        except AttributeError as e:
+            raise ImportError(
+                f"MediaPipe pose module not available. Please ensure mediapipe>=0.10.0 is installed. "
+                f"Current error: {e}. Try: pip install --upgrade mediapipe"
+            )
         
     def extract_keypoints(self, frame: np.ndarray) -> Optional[np.ndarray]:
         """

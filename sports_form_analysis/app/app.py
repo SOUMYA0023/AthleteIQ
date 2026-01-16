@@ -85,8 +85,14 @@ def load_model():
 def analyze_video(video_path: str):
     """Perform complete analysis on video"""
     
-    # Initialize components
-    pose_extractor = PoseExtractor()
+    # Initialize components with error handling
+    try:
+        pose_extractor = PoseExtractor()
+    except ImportError as e:
+        st.error(f"MediaPipe initialization failed: {e}")
+        st.info("Please ensure mediapipe is installed: pip install mediapipe")
+        return None
+    
     feature_engineer = FeatureEngineer()
     rule_evaluator = RuleBasedEvaluator()
     ml_classifier = load_model()
