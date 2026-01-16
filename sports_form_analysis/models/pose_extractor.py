@@ -8,22 +8,21 @@ import numpy as np
 from typing import List, Tuple, Optional
 
 # Import MediaPipe with error handling
+MEDIAPIPE_AVAILABLE = False
+mp = None
+import_error = None
+
 try:
     import mediapipe as mp
     # Verify MediaPipe has the required modules
-    if not hasattr(mp, 'solutions'):
-        raise ImportError("MediaPipe solutions module not available")
-    if not hasattr(mp.solutions, 'pose'):
-        raise ImportError("MediaPipe pose module not available")
-    MEDIAPIPE_AVAILABLE = True
+    if hasattr(mp, 'solutions') and hasattr(mp.solutions, 'pose'):
+        MEDIAPIPE_AVAILABLE = True
+    else:
+        import_error = "MediaPipe solutions.pose module not available"
 except ImportError as e:
-    MEDIAPIPE_AVAILABLE = False
-    mp = None
-    import_error = str(e)
-except AttributeError as e:
-    MEDIAPIPE_AVAILABLE = False
-    mp = None
-    import_error = f"MediaPipe attribute error: {e}"
+    import_error = f"MediaPipe import failed: {e}"
+except Exception as e:
+    import_error = f"MediaPipe initialization error: {e}"
 
 
 class PoseExtractor:
@@ -40,14 +39,19 @@ class PoseExtractor:
             min_detection_confidence: Minimum confidence for pose detection
             min_tracking_confidence: Minimum confidence for pose tracking
         """
-        if not MEDIAPIPE_AVAILABLE:
-            error_msg = import_error if 'import_error' in globals() else "MediaPipe is not installed"
+        if not MEDIAPIPE_AVAILABLE or mp is None:
+            error_msg = import_error if import_error else "MediaPipe is not installed"
             raise ImportError(
                 f"{error_msg}. Please install it with: pip install mediapipe>=0.10.0"
             )
         
         try:
             # Access MediaPipe pose solution
+            if not hasattr(mp, 'solutions'):
+                raise ImportError("MediaPipe 'solutions' attribute not found")
+            if not hasattr(mp.solutions, 'pose'):
+                raise ImportError("MediaPipe 'solutions.pose' attribute not found")
+            
             self.mp_pose = mp.solutions.pose
             self.pose = self.mp_pose.Pose(
                 min_detection_confidence=min_detection_confidence,
