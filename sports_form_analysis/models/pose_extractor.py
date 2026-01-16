@@ -10,7 +10,7 @@ from typing import List, Tuple, Optional
 # Import MediaPipe with error handling
 MEDIAPIPE_AVAILABLE = False
 mp = None
-import_error = None
+_import_error = None
 
 try:
     import mediapipe as mp
@@ -18,11 +18,11 @@ try:
     if hasattr(mp, 'solutions') and hasattr(mp.solutions, 'pose'):
         MEDIAPIPE_AVAILABLE = True
     else:
-        import_error = "MediaPipe solutions.pose module not available"
+        _import_error = "MediaPipe solutions.pose module not available"
 except ImportError as e:
-    import_error = f"MediaPipe import failed: {e}"
+    _import_error = f"MediaPipe import failed: {e}"
 except Exception as e:
-    import_error = f"MediaPipe initialization error: {e}"
+    _import_error = f"MediaPipe initialization error: {e}"
 
 
 class PoseExtractor:
@@ -40,7 +40,7 @@ class PoseExtractor:
             min_tracking_confidence: Minimum confidence for pose tracking
         """
         if not MEDIAPIPE_AVAILABLE or mp is None:
-            error_msg = import_error if import_error else "MediaPipe is not installed"
+            error_msg = _import_error if _import_error else "MediaPipe is not installed"
             raise ImportError(
                 f"{error_msg}. Please install it with: pip install mediapipe>=0.10.0"
             )
