@@ -49,16 +49,12 @@ class PoseExtractor:
         if not MEDIAPIPE_AVAILABLE or mp is None:
             error_msg = _import_error if _import_error else "MediaPipe is not installed"
             raise ImportError(
-                f"{error_msg}. Please install it with: pip install mediapipe>=0.10.0"
+                f"{error_msg}. Please install it with: pip install mediapipe==0.10.14"
             )
         
+        # If we got here, MediaPipe is available and solutions.pose is accessible
+        # (we already verified this in the module-level import)
         try:
-            # Access MediaPipe pose solution
-            if not hasattr(mp, 'solutions'):
-                raise ImportError("MediaPipe 'solutions' attribute not found")
-            if not hasattr(mp.solutions, 'pose'):
-                raise ImportError("MediaPipe 'solutions.pose' attribute not found")
-            
             self.mp_pose = mp.solutions.pose
             self.pose = self.mp_pose.Pose(
                 min_detection_confidence=min_detection_confidence,
@@ -66,10 +62,11 @@ class PoseExtractor:
                 model_complexity=2  # Use full model for better accuracy
             )
             self.mp_drawing = mp.solutions.drawing_utils
-        except AttributeError as e:
+        except (AttributeError, TypeError) as e:
             raise ImportError(
-                f"MediaPipe pose module not available. Please ensure mediapipe>=0.10.0 is installed. "
-                f"Current error: {e}. Try: pip install --upgrade mediapipe"
+                f"Failed to initialize MediaPipe Pose. Error: {e}. "
+                f"MediaPipe version: {getattr(mp, '__version__', 'unknown')}. "
+                f"Try: pip install --upgrade mediapipe==0.10.14"
             )
         
     def extract_keypoints(self, frame: np.ndarray) -> Optional[np.ndarray]:
