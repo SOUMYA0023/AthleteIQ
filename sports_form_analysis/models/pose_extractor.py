@@ -14,25 +14,27 @@ _import_error = None
 
 try:
     import mediapipe as mp
-    # For MediaPipe 0.10.30+, the structure might be different
-    # Try standard import first
+    # MediaPipe 0.10.30+ should have solutions attribute
+    # Try to access it directly - this forces MediaPipe to load the module
     try:
+        # Direct access - this will work if MediaPipe is properly installed
         _test_pose = mp.solutions.pose
         _test_drawing = mp.solutions.drawing_utils
         MEDIAPIPE_AVAILABLE = True
-    except AttributeError:
-        # Try alternative import for newer versions
+    except AttributeError as attr_e:
+        # If solutions doesn't exist, try importing directly
         try:
-            from mediapipe.python.solutions import pose as mp_pose_module
-            from mediapipe.python.solutions import drawing_utils as mp_drawing_module
-            # Create a solutions-like object
+            # Some versions might need direct import
+            import mediapipe.solutions.pose as mp_pose
+            import mediapipe.solutions.drawing_utils as mp_drawing
+            # Create solutions object
             class Solutions:
-                pose = mp_pose_module
-                drawing_utils = mp_drawing_module
+                pose = mp_pose
+                drawing_utils = mp_drawing
             mp.solutions = Solutions()
             MEDIAPIPE_AVAILABLE = True
-        except (ImportError, AttributeError) as alt_e:
-            _import_error = f"MediaPipe solutions not accessible. Version: {getattr(mp, '__version__', 'unknown')}. Error: {alt_e}"
+        except (ImportError, AttributeError) as import_e:
+            _import_error = f"MediaPipe solutions not accessible. Version: {getattr(mp, '__version__', 'unknown')}. AttributeError: {attr_e}, ImportError: {import_e}"
             MEDIAPIPE_AVAILABLE = False
 except ImportError as e:
     _import_error = f"MediaPipe import failed: {e}. Please install with: pip install mediapipe>=0.10.30"
