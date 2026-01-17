@@ -12,27 +12,20 @@ from pathlib import Path
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
 
-# Import and run the Streamlit app
+# Import the main function from the app
+sys.path.insert(0, str(current_dir / 'sports_form_analysis'))
+
 if __name__ == "__main__":
-    import streamlit.web.bootstrap as bootstrap
+    # Set environment variables for Streamlit before importing
+    port = os.environ.get("PORT", "8501")
+    os.environ["STREAMLIT_SERVER_PORT"] = port
+    os.environ["STREAMLIT_SERVER_ADDRESS"] = "0.0.0.0"
+    os.environ["STREAMLIT_SERVER_ENABLE_CORS"] = "false"
+    os.environ["STREAMLIT_SERVER_ENABLE_XSRFPROTECTION"] = "false"
     
-    # Get the port from environment, default to 8501
-    port = int(os.environ.get("PORT", 8501))
+    # Now import and run the app
+    import streamlit as st
+    from sports_form_analysis.app.app import main
     
-    # Set Streamlit server configuration
-    sys.argv = [
-        "streamlit", 
-        "run", 
-        "sports_form_analysis/app/app.py",
-        "--server.port", 
-        str(port),
-        "--server.address", 
-        "0.0.0.0",
-        "--server.enableCORS", 
-        "false",
-        "--server.enableXsrfProtection", 
-        "false"
-    ]
-    
-    # Start the Streamlit app
-    bootstrap.main()
+    # Run the main function
+    main()
