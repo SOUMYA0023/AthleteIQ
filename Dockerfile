@@ -19,8 +19,11 @@ COPY requirements_unified.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements_unified.txt
 
-# Verify and reinstall mediapipe if needed to ensure proper installation
-RUN python -c "import mediapipe as mp; print('MediaPipe version:', mp.__version__)" || pip install --force-reinstall mediapipe>=0.10.30
+# Clean install of mediapipe to ensure proper setup
+RUN pip uninstall -y mediapipe opencv-python opencv-python-headless || true
+RUN pip install --no-cache-dir opencv-python-headless>=4.8.0
+RUN pip install --no-cache-dir --force-reinstall mediapipe>=0.10.30
+RUN python -c "import mediapipe as mp; print('MediaPipe version:', mp.__version__); print('Solutions module accessible:', hasattr(mp, 'solutions')); print('Pose available:', hasattr(mp.solutions, 'pose'))"
 
 # Copy application code
 COPY . .
