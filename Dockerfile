@@ -23,14 +23,14 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy pinned requirements
-COPY requirements.txt .
+COPY requirements_unified.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements_unified.txt
 
 # Verify MediaPipe installation
-RUN python -c "import mediapipe as mp; print('MediaPipe version:', mp.__version__); print('Solutions module accessible:', hasattr(mp, 'solutions')); print('Pose available:', hasattr(getattr(mp, 'solutions', {}), 'pose'))""
+RUN python -c "import mediapipe as mp; print('MediaPipe version:', mp.__version__); print('Solutions module accessible:', hasattr(mp, 'solutions')); print('Pose available:', hasattr(getattr(mp, 'solutions', {}), 'pose'))"
 
 # Copy application code
 COPY . .
