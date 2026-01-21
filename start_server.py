@@ -19,7 +19,7 @@ sys.path.insert(0, str(current_dir))
 
 if __name__ == "__main__":
     # Get the port from environment, default to 8501
-    port = os.environ.get("PORT", "8501")
+    port = os.environ.get("PORT", "8080")
     
     # Run the Streamlit app as a subprocess
     cmd = [
