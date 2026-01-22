@@ -23,11 +23,11 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy pinned requirements
-COPY requirements_unified.txt .
+COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir -r requirements_unified.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Verify MediaPipe installation
 RUN python -c "import mediapipe as mp; print('MediaPipe version:', mp.__version__); print('Solutions module accessible:', hasattr(mp, 'solutions')); print('Pose available:', hasattr(getattr(mp, 'solutions', {}), 'pose'))"
@@ -36,4 +36,4 @@ RUN python -c "import mediapipe as mp; print('MediaPipe version:', mp.__version_
 COPY . .
 
 # Expose port
-EXPOSE 8501
+EXPOSE 8080

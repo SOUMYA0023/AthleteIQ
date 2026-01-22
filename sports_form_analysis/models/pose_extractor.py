@@ -15,18 +15,18 @@ _import_error = None
 try:
     import mediapipe as mp
     mp_version = getattr(mp, '__version__', 'unknown')
-    
-    # Try to access solutions.pose directly
-    # This is the standard way for MediaPipe 0.10.30+
+
+    # Try to access the new PoseLandmarker API
+    # MediaPipe changed its API in newer versions
     try:
-        _test_pose = mp.solutions.pose
-        _test_drawing = mp.solutions.drawing_utils
+        _test_pose = mp.tasks.vision.PoseLandmarker
+        _test_options = mp.tasks.vision.PoseLandmarkerOptions
         MEDIAPIPE_AVAILABLE = True
     except AttributeError as attr_e:
         # If direct access fails, MediaPipe might not be properly installed
         # or there's a version compatibility issue
         _import_error = (
-            f"MediaPipe solutions.pose not accessible. "
+            f"MediaPipe PoseLandmarker not accessible. "
             f"Version: {mp_version}. "
             f"Error: {attr_e}. "
             f"Please ensure mediapipe>=0.10.30 is correctly installed."
@@ -44,12 +44,12 @@ class PoseExtractor:
     """
     Extracts human pose keypoints from video frames using MediaPipe Pose
     """
-    
-    def __init__(self, min_detection_confidence: float = 0.5, 
+
+    def __init__(self, min_detection_confidence: float = 0.5,
                  min_tracking_confidence: float = 0.5):
         """
         Initialize MediaPipe Pose model
-        
+
         Args:
             min_detection_confidence: Minimum confidence for pose detection
             min_tracking_confidence: Minimum confidence for pose tracking
@@ -59,20 +59,47 @@ class PoseExtractor:
             raise ImportError(
                 f"{error_msg}. Please install it with: pip install mediapipe>=0.10.30"
             )
-        
-        # If we got here, MediaPipe is available and solutions.pose is accessible
+
+        # If we got here, MediaPipe is available with the new API
         try:
-            self.mp_pose = mp.solutions.pose
-            self.pose = self.mp_pose.Pose(
-                min_detection_confidence=min_detection_confidence,
-                min_tracking_confidence=min_tracking_confidence,
-                model_complexity=2  # Use full model for better accuracy
+            BaseOptions = mp.tasks.BaseOptions
+            PoseLandmarker = mp.tasks.vision.PoseLandmarker
+            PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
+            VisionRunningMode = mp.tasks.vision.RunningMode
+
+            # Create the model asset path by downloading the model file
+            import tempfile
+            import urllib.request
+            import os
+
+            # Download the pose landmarker model to a temporary file
+            model_url = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task"
+            model_path = os.path.join(os.path.dirname(__file__), "assets", "pose_landmarker_full.task")
+
+            # Create assets directory if it doesn't exist
+            os.makedirs(os.path.dirname(model_path), exist_ok=True)
+
+            # Download the model if it doesn't exist locally
+            if not os.path.exists(model_path):
+                print(f"Downloading pose landmarker model to {model_path}...")
+                urllib.request.urlretrieve(model_url, model_path)
+                print("Model downloaded successfully.")
+
+            self.pose_landmarker = PoseLandmarker.create_from_options(
+                PoseLandmarkerOptions(
+                    base_options=BaseOptions(model_asset_path=model_path),
+                    running_mode=VisionRunningMode.IMAGE,  # Use IMAGE mode for single frames
+                    min_pose_detection_confidence=min_detection_confidence,
+                    min_tracking_confidence=min_tracking_confidence
+                )
             )
-            self.mp_drawing = mp.solutions.drawing_utils
+
+            # Store references for later use
+            self.mp_vision = mp.tasks.vision
         except (AttributeError, TypeError) as e:
             mp_version = getattr(mp, '__version__', 'unknown')
             raise ImportError(
-                f"Failed to initialize MediaPipe Pose. Error: {e}. "
+                f"Failed to initialize MediaPipe PoseLandmarker. Error: {e}. "
                 f"MediaPipe version: {mp_version}. "
                 f"This might be a version compatibility issue. "
                 f"Try: pip install --upgrade mediapipe>=0.10.30"
@@ -81,29 +108,31 @@ class PoseExtractor:
     def extract_keypoints(self, frame: np.ndarray) -> Optional[np.ndarray]:
         """
         Extract pose keypoints from a single frame
-        
+
         Args:
             frame: Input frame (BGR format)
-            
+
         Returns:
             Array of shape (33, 3) containing (x, y, visibility) for each keypoint
             Returns None if no pose detected
         """
         # Convert BGR to RGB
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        rgb_frame.flags.writeable = False
-        
+
+        # Convert to MediaPipe Image format
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+
         # Process frame
-        results = self.pose.process(rgb_frame)
-        
-        if not results.pose_landmarks:
+        detection_result = self.pose_landmarker.detect(mp_image)
+
+        if not detection_result.pose_landmarks:
             return None
-        
+
         # Extract keypoints
         keypoints = np.zeros((33, 3))
-        for idx, landmark in enumerate(results.pose_landmarks.landmark):
+        for idx, landmark in enumerate(detection_result.pose_landmarks[0]):  # Take first person detected
             keypoints[idx] = [landmark.x, landmark.y, landmark.visibility]
-        
+
         return keypoints
     
     def extract_from_video(self, video_path: str) -> Tuple[List[np.ndarray], List[np.ndarray]]:
@@ -139,59 +168,49 @@ class PoseExtractor:
     
     def draw_pose(self, frame: np.ndarray, keypoints: Optional[np.ndarray]) -> np.ndarray:
         """
-        Draw pose skeleton on frame using MediaPipe
-        
+        Draw pose skeleton on frame using OpenCV (since drawing_utils is not available in new API)
+
         Args:
             frame: Input frame
             keypoints: Keypoints array (33, 3)
-            
+
         Returns:
             Annotated frame
         """
         if keypoints is None:
             return frame
-        
-        # Convert BGR to RGB for MediaPipe
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        rgb_frame.flags.writeable = False
-        
-        # Create MediaPipe landmark objects
-        landmarks = self.mp_pose.PoseLandmark
-        
-        # Create a results-like object for drawing
-        class PoseLandmark:
-            def __init__(self, x, y, z, visibility):
-                self.x = x
-                self.y = y
-                self.z = z
-                self.visibility = visibility
-        
-        class PoseLandmarks:
-            def __init__(self, keypoints):
-                self.landmark = [PoseLandmark(kp[0], kp[1], 0, kp[2]) for kp in keypoints]
-        
-        class Results:
-            def __init__(self, keypoints):
-                self.pose_landmarks = PoseLandmarks(keypoints)
-        
-        results = Results(keypoints)
-        
-        # Draw pose
+
         annotated_frame = frame.copy()
-        rgb_annotated = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-        rgb_annotated.flags.writeable = True
-        
-        self.mp_drawing.draw_landmarks(
-            rgb_annotated,
-            results.pose_landmarks,
-            self.mp_pose.POSE_CONNECTIONS,
-            self.mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-            self.mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
-        )
-        
-        # Convert back to BGR
-        annotated_frame = cv2.cvtColor(rgb_annotated, cv2.COLOR_RGB2BGR)
-        
+        h, w, _ = frame.shape
+
+        # Define connections between keypoints (simplified version of POSE_CONNECTIONS)
+        POSE_CONNECTIONS = [
+            (11, 12), (11, 13), (12, 14), (13, 15), (14, 16),  # upper body
+            (23, 24), (11, 23), (12, 24),  # torso
+            (23, 25), (24, 26), (25, 27), (26, 28), (27, 29), (28, 30), (29, 31), (30, 32)  # legs
+        ]
+
+        # Draw keypoints
+        for idx, (x_norm, y_norm, visibility) in enumerate(keypoints):
+            if visibility > 0.5:  # Only draw visible keypoints
+                x = int(x_norm * w)
+                y = int(y_norm * h)
+                cv2.circle(annotated_frame, (x, y), 4, (0, 255, 0), -1)
+
+        # Draw connections
+        for connection in POSE_CONNECTIONS:
+            start_idx, end_idx = connection
+            start_point = keypoints[start_idx]
+            end_point = keypoints[end_idx]
+
+            if start_point[2] > 0.5 and end_point[2] > 0.5:  # Both keypoints visible
+                start_x = int(start_point[0] * w)
+                start_y = int(start_point[1] * h)
+                end_x = int(end_point[0] * w)
+                end_y = int(end_point[1] * h)
+
+                cv2.line(annotated_frame, (start_x, start_y), (end_x, end_y), (0, 0, 255), 2)
+
         return annotated_frame
     
     def normalize_keypoints(self, keypoints: np.ndarray, 
@@ -234,4 +253,5 @@ class PoseExtractor:
     
     def close(self):
         """Release MediaPipe resources"""
-        self.pose.close()
+        if hasattr(self, 'pose_landmarker'):
+            self.pose_landmarker.close()
